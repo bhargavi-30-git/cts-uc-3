@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UC3 Full Stack App</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #0078d4; }
+    button { background: #0078d4; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; margin-top: 10px; }
+    button:hover { background: #005a9e; }
+    input[type="file"] { margin: 10px 0; display: block; }
+    #fileList { margin-top: 20px; }
+    #fileList ul { padding-left: 20px; }
+    #message { color: green; margin-top: 10px; }
+    .section { border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1>UC3 Full Stack App</h1>
+
+  <div class="section">
+    <h2>Upload a File</h2>
+    <input type="file" id="fileInput" />
+    <button onclick="uploadFile()">Upload to Azure Storage</button>
+    <p id="message"></p>
+  </div>
+
+  <div class="section">
+    <h2>List Uploaded Files</h2>
+    <button onclick="listFiles()">Refresh File List</button>
+    <div id="fileList"><p>Click refresh to load files.</p></div>
+  </div>
+
+  <script>
+    const BACKEND_URL = "https://avi-backend-bgd3bhfjf6erdwhg.centralindia-01.azurewebsites.net";
+
+    async function uploadFile() {
+      const fileInput = document.getElementById("fileInput");
+      const message = document.getElementById("message");
+      if (!fileInput.files[0]) {
+        message.style.color = "red";
+        message.textContent = "Please select a file first.";
+        return;
+      }
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/storage/upload`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await response.json();
+        message.style.color = "green";
+        message.textContent = "Uploaded: " + data.fileName;
+        listFiles();
+      } catch (err) {
+        message.style.color = "red";
+        message.textContent = "Upload failed: " + err.message;
+      }
+    }
+
+    async function listFiles() {
+      const fileList = document.getElementById("fileList");
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/storage/list`);
+        const files = await response.json();
+        if (files.length === 0) {
+          fileList.innerHTML = "<p>No files uploaded yet.</p>";
+        } else {
+          fileList.innerHTML = "<ul>" + files.map(f => `<li>${f}</li>`).join("") + "</ul>";
+        }
+      } catch (err) {
+        fileList.innerHTML = "<p style='color:red'>Could not load files: " + err.message + "</p>";
+      }
+    }
+  </script>
+</body>
+</html>

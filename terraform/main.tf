@@ -1,9 +1,3 @@
-# ============================================================
-# Terraform — UC3 Full Stack Deployment
-# Resources: Frontend App Service + Backend App Service + Blob Storage
-# Region: Central India | All Free/Standard tier
-# ============================================================
-
 terraform {
   required_providers {
     azurerm = {
@@ -12,6 +6,14 @@ terraform {
     }
   }
   required_version = ">= 1.3.0"
+
+  # Remote state stored in your existing storage account
+  backend "azurerm" {
+    resource_group_name  = "uc5-state-rg"
+    storage_account_name = "uc5tfstate234"
+    container_name       = "tfstate"
+    key                  = "uc3.fullstack.tfstate"
+  }
 }
 
 provider "azurerm" {
@@ -19,7 +21,7 @@ provider "azurerm" {
 }
 
 # ============================================================
-# VARIABLES — change these for each new deployment
+# VARIABLES
 # ============================================================
 
 variable "resource_group_name" {
@@ -31,15 +33,15 @@ variable "location" {
 }
 
 variable "frontend_app_name" {
-  default = "tf-uc3-frontend"        # must be globally unique
+  default = "tf-uc3-frontend"
 }
 
 variable "backend_app_name" {
-  default = "tf-uc3-backend"         # must be globally unique
+  default = "tf-uc3-backend"
 }
 
 variable "storage_account_name" {
-  default = "tfuc3storage001"        # lowercase, no hyphens, globally unique
+  default = "tfuc3storage001"
 }
 
 variable "storage_container_name" {
@@ -60,7 +62,7 @@ resource "azurerm_resource_group" "rg" {
 }
 
 # ============================================================
-# APP SERVICE PLAN — F1 Free tier (shared between both apps)
+# APP SERVICE PLAN — F1 Free
 # ============================================================
 
 resource "azurerm_service_plan" "asp" {
@@ -72,7 +74,7 @@ resource "azurerm_service_plan" "asp" {
 }
 
 # ============================================================
-# FRONTEND APP SERVICE — Node 24 LTS
+# FRONTEND — Node 24 LTS
 # ============================================================
 
 resource "azurerm_linux_web_app" "frontend" {
@@ -83,20 +85,12 @@ resource "azurerm_linux_web_app" "frontend" {
   https_only          = true
 
   site_config {
-    always_on     = false
-    http2_enabled = false
+    always_on        = false
+    http2_enabled    = false
+    app_command_line = "pm2 serve /home/site/wwwroot --no-daemon --spa"
 
     application_stack {
       node_version = "24-lts"
-    }
-
-    app_command_line = "pm2 serve /home/site/wwwroot --no-daemon --spa"
-
-    ip_restriction {
-      ip_address = "Any"
-      action     = "Allow"
-      priority   = 2147483647
-      name       = "Allow all"
     }
   }
 
@@ -106,7 +100,7 @@ resource "azurerm_linux_web_app" "frontend" {
 }
 
 # ============================================================
-# BACKEND APP SERVICE — .NET 8
+# BACKEND — .NET 8
 # ============================================================
 
 resource "azurerm_linux_web_app" "backend" {
@@ -117,20 +111,12 @@ resource "azurerm_linux_web_app" "backend" {
   https_only          = true
 
   site_config {
-    always_on     = false
-    http2_enabled = false
+    always_on        = false
+    http2_enabled    = false
+    app_command_line = "dotnet BackendApi.dll"
 
     application_stack {
       dotnet_version = "8.0"
-    }
-
-    app_command_line = "dotnet BackendApi.dll"
-
-    ip_restriction {
-      ip_address = "Any"
-      action     = "Allow"
-      priority   = 2147483647
-      name       = "Allow all"
     }
   }
 
@@ -145,14 +131,13 @@ resource "azurerm_linux_web_app" "backend" {
 # ============================================================
 
 resource "azurerm_storage_account" "storage" {
-  name                     = var.storage_account_name
-  resource_group_name      = azurerm_resource_group.rg.name
-  location                 = azurerm_resource_group.rg.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-  account_kind             = "StorageV2"
-  access_tier              = "Hot"
-
+  name                            = var.storage_account_name
+  resource_group_name             = azurerm_resource_group.rg.name
+  location                        = azurerm_resource_group.rg.location
+  account_tier                    = "Standard"
+  account_replication_type        = "LRS"
+  account_kind                    = "StorageV2"
+  access_tier                     = "Hot"
   min_tls_version                 = "TLS1_2"
   allow_nested_items_to_be_public = false
   https_traffic_only_enabled      = true
@@ -173,7 +158,7 @@ resource "azurerm_storage_account" "storage" {
 }
 
 # ============================================================
-# BLOB CONTAINER — uploads (private)
+# BLOB CONTAINER — uploads
 # ============================================================
 
 resource "azurerm_storage_container" "uploads" {
@@ -187,24 +172,13 @@ resource "azurerm_storage_container" "uploads" {
 # ============================================================
 
 output "frontend_url" {
-  value       = "https://${azurerm_linux_web_app.frontend.default_hostname}"
-  description = "Frontend App Service URL"
+  value = "https://${azurerm_linux_web_app.frontend.default_hostname}"
 }
 
 output "backend_url" {
-  value       = "https://${azurerm_linux_web_app.backend.default_hostname}"
-  description = "Backend App Service URL"
+  value = "https://${azurerm_linux_web_app.backend.default_hostname}"
 }
 
 output "backend_api_test_url" {
-  value       = "https://${azurerm_linux_web_app.backend.default_hostname}/api/storage/list"
-  description = "Test URL — should return [] when backend is running"
-}
-
-output "storage_account_name" {
-  value       = azurerm_storage_account.storage.name
-}
-
-output "storage_container_name" {
-  value       = azurerm_storage_container.uploads.name
+  value = "https://${azurerm_linux_web_app.backend.default_hostname}/api/storage/list"
 }
