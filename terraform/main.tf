@@ -9,11 +9,11 @@ terraform {
 
   # Remote state stored in your existing storage account
   backend "azurerm" {
-    resource_group_name  = "uc5-state-rg"
-    storage_account_name = "uc5tfstate234"
-    container_name       = "tfstate"
-    key                  = "uc3.fullstack.tfstate"
-  }
+  resource_group_name  = "uc5-state-rg"
+  storage_account_name = "uc5tfstate234"
+  container_name       = "tfstate-uc3"
+  key                  = "uc3_infra.tfstate"
+}
 }
 
 provider "azurerm" {
