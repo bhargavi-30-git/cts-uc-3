@@ -51,6 +51,10 @@ variable "app_service_plan_name" {
   default = "tf-uc3-asp"
 }
 
+variable "acr_name" {
+  default = "tfuc3acr001"
+}
+
 # ============================================================
 # RESOURCE GROUP
 # ============================================================
@@ -61,7 +65,19 @@ resource "azurerm_resource_group" "rg" {
 }
 
 # ============================================================
-# APP SERVICE PLAN — F1 Free
+# AZURE CONTAINER REGISTRY — Basic tier
+# ============================================================
+
+resource "azurerm_container_registry" "acr" {
+  name                = var.acr_name
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  sku                 = "Basic"
+  admin_enabled       = true
+}
+
+# ============================================================
+# APP SERVICE PLAN — B1 (required for container deployment)
 # ============================================================
 
 resource "azurerm_service_plan" "asp" {
@@ -69,11 +85,11 @@ resource "azurerm_service_plan" "asp" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   os_type             = "Linux"
-  sku_name            = "F1"
+  sku_name            = "B1"
 }
 
 # ============================================================
-# FRONTEND — Node 20 LTS
+# FRONTEND APP SERVICE — nginx Docker container
 # ============================================================
 
 resource "azurerm_linux_web_app" "frontend" {
@@ -84,22 +100,27 @@ resource "azurerm_linux_web_app" "frontend" {
   https_only          = true
 
   site_config {
-    always_on        = false
-    http2_enabled    = false
-    app_command_line = "pm2 serve /home/site/wwwroot --no-daemon --spa"
+    always_on = true
 
     application_stack {
-      node_version = "20-lts"
+      docker_image_name        = "frontend:latest"
+      docker_registry_url      = "https://${azurerm_container_registry.acr.login_server}"
+      docker_registry_username = azurerm_container_registry.acr.admin_username
+      docker_registry_password = azurerm_container_registry.acr.admin_password
     }
   }
 
   app_settings = {
+    WEBSITES_PORT                       = "8080"
     WEBSITES_ENABLE_APP_SERVICE_STORAGE = "false"
+    DOCKER_REGISTRY_SERVER_URL          = "https://${azurerm_container_registry.acr.login_server}"
+    DOCKER_REGISTRY_SERVER_USERNAME     = azurerm_container_registry.acr.admin_username
+    DOCKER_REGISTRY_SERVER_PASSWORD     = azurerm_container_registry.acr.admin_password
   }
 }
 
 # ============================================================
-# BACKEND — .NET 8
+# BACKEND APP SERVICE — .NET 8 Docker container
 # ============================================================
 
 resource "azurerm_linux_web_app" "backend" {
@@ -110,18 +131,24 @@ resource "azurerm_linux_web_app" "backend" {
   https_only          = true
 
   site_config {
-    always_on        = false
-    http2_enabled    = false
-    app_command_line = "dotnet BackendApi.dll"
+    always_on = true
 
     application_stack {
-      dotnet_version = "8.0"
+      docker_image_name        = "backend:latest"
+      docker_registry_url      = "https://${azurerm_container_registry.acr.login_server}"
+      docker_registry_username = azurerm_container_registry.acr.admin_username
+      docker_registry_password = azurerm_container_registry.acr.admin_password
     }
   }
 
   app_settings = {
-    AZURE_STORAGE_CONNECTION_STRING = azurerm_storage_account.storage.primary_connection_string
-    AZURE_STORAGE_CONTAINER_NAME    = var.storage_container_name
+    WEBSITES_PORT                       = "8080"
+    WEBSITES_ENABLE_APP_SERVICE_STORAGE = "false"
+    DOCKER_REGISTRY_SERVER_URL          = "https://${azurerm_container_registry.acr.login_server}"
+    DOCKER_REGISTRY_SERVER_USERNAME     = azurerm_container_registry.acr.admin_username
+    DOCKER_REGISTRY_SERVER_PASSWORD     = azurerm_container_registry.acr.admin_password
+    AZURE_STORAGE_CONNECTION_STRING     = azurerm_storage_account.storage.primary_connection_string
+    AZURE_STORAGE_CONTAINER_NAME        = var.storage_container_name
   }
 }
 
@@ -170,6 +197,17 @@ resource "azurerm_storage_container" "uploads" {
 # OUTPUTS
 # ============================================================
 
+output "acr_login_server" {
+  value       = azurerm_container_registry.acr.login_server
+  description = "ACR login server URL"
+}
+
+output "acr_admin_username" {
+  value       = azurerm_container_registry.acr.admin_username
+  description = "ACR admin username"
+  sensitive   = true
+}
+
 output "frontend_url" {
   value = "https://${azurerm_linux_web_app.frontend.default_hostname}"
 }
@@ -184,8 +222,4 @@ output "backend_api_test_url" {
 
 output "storage_account_name" {
   value = azurerm_storage_account.storage.name
-}
-
-output "storage_container_name" {
-  value = azurerm_storage_container.uploads.name
 }

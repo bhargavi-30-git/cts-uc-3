@@ -6,54 +6,74 @@ trigger:
 pool:
   vmImage: "ubuntu-latest"
 
+variables:
+  ACR_NAME: "tfuc3acr001"
+  ACR_LOGIN_SERVER: "tfuc3acr001.azurecr.io"
+  BACKEND_IMAGE: "backend"
+  FRONTEND_IMAGE: "frontend"
+  IMAGE_TAG: "$(Build.BuildId)"
+
 stages:
 
-# ── STAGE 1: Build Backend ──────────────────────────────────
-- stage: Build_Backend
-  displayName: "Build Backend"
+# ── STAGE 1: Build & Push Backend Image ─────────────────────
+- stage: Build_Push_Backend
+  displayName: "Build & Push Backend Image"
   jobs:
   - job: BuildBackend
     steps:
-    - task: UseDotNet@2
+    - task: Docker@2
+      displayName: "Build Backend Docker Image"
       inputs:
-        packageType: "sdk"
-        version: "8.x"
+        command: "build"
+        repository: "$(BACKEND_IMAGE)"
+        dockerfile: "BackendApi/Dockerfile"
+        buildContext: "BackendApi"
+        tags: |
+          $(IMAGE_TAG)
+          latest
 
-    - script: dotnet restore
-      workingDirectory: BackendApi
-      displayName: "Restore packages"
-
-    - script: dotnet publish -c Release -o $(Build.ArtifactStagingDirectory)/backend
-      workingDirectory: BackendApi
-      displayName: "Publish backend"
-
-    - task: PublishPipelineArtifact@1
+    - task: Docker@2
+      displayName: "Push Backend to ACR"
       inputs:
-        targetPath: "$(Build.ArtifactStagingDirectory)/backend"
-        artifact: "backend-drop"
+        command: "push"
+        containerRegistry: "tfuc3acr001"
+        repository: "$(BACKEND_IMAGE)"
+        tags: |
+          $(IMAGE_TAG)
+          latest
 
-# ── STAGE 2: Build Frontend ─────────────────────────────────
-- stage: Build_Frontend
-  displayName: "Build Frontend"
+# ── STAGE 2: Build & Push Frontend Image ────────────────────
+- stage: Build_Push_Frontend
+  displayName: "Build & Push Frontend Image"
   dependsOn: []
   jobs:
   - job: BuildFrontend
     steps:
-    - task: CopyFiles@2
+    - task: Docker@2
+      displayName: "Build Frontend Docker Image"
       inputs:
-        SourceFolder: "FrontendApp"
-        Contents: "**"
-        TargetFolder: "$(Build.ArtifactStagingDirectory)/frontend"
+        command: "build"
+        repository: "$(FRONTEND_IMAGE)"
+        dockerfile: "FrontendApp/Dockerfile"
+        buildContext: "FrontendApp"
+        tags: |
+          $(IMAGE_TAG)
+          latest
 
-    - task: PublishPipelineArtifact@1
+    - task: Docker@2
+      displayName: "Push Frontend to ACR"
       inputs:
-        targetPath: "$(Build.ArtifactStagingDirectory)/frontend"
-        artifact: "frontend-drop"
+        command: "push"
+        containerRegistry: "tfuc3acr001"
+        repository: "$(FRONTEND_IMAGE)"
+        tags: |
+          $(IMAGE_TAG)
+          latest
 
-# ── STAGE 3: Deploy Backend ─────────────────────────────────
+# ── STAGE 3: Deploy Backend Container to App Service ────────
 - stage: Deploy_Backend
-  displayName: "Deploy Backend"
-  dependsOn: Build_Backend
+  displayName: "Deploy Backend to App Service"
+  dependsOn: Build_Push_Backend
   jobs:
   - deployment: DeployBackend
     environment: "production"
@@ -61,17 +81,17 @@ stages:
       runOnce:
         deploy:
           steps:
-          - task: AzureWebApp@1
+          - task: AzureWebAppContainer@1
+            displayName: "Deploy Backend Container"
             inputs:
               azureSubscription: "Azure for Students"
-              appType: "webAppLinux"
               appName: "tf-uc3-backend"
-              package: "$(Pipeline.Workspace)/backend-drop"
+              containers: "$(ACR_LOGIN_SERVER)/$(BACKEND_IMAGE):$(IMAGE_TAG)"
 
-# ── STAGE 4: Deploy Frontend ────────────────────────────────
+# ── STAGE 4: Deploy Frontend Container to App Service ───────
 - stage: Deploy_Frontend
-  displayName: "Deploy Frontend"
-  dependsOn: Build_Frontend
+  displayName: "Deploy Frontend to App Service"
+  dependsOn: Build_Push_Frontend
   jobs:
   - deployment: DeployFrontend
     environment: "production"
@@ -79,9 +99,9 @@ stages:
       runOnce:
         deploy:
           steps:
-          - task: AzureWebApp@1
+          - task: AzureWebAppContainer@1
+            displayName: "Deploy Frontend Container"
             inputs:
               azureSubscription: "Azure for Students"
-              appType: "webAppLinux"
               appName: "tf-uc3-frontend"
-              package: "$(Pipeline.Workspace)/frontend-drop"
+              containers: "$(ACR_LOGIN_SERVER)/$(FRONTEND_IMAGE):$(IMAGE_TAG)"
