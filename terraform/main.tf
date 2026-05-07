@@ -7,13 +7,12 @@ terraform {
   }
   required_version = ">= 1.3.0"
 
-  # Remote state stored in your existing storage account
   backend "azurerm" {
-  resource_group_name  = "uc5-state-rg"
-  storage_account_name = "uc5tfstate234"
-  container_name       = "tfstate-uc3"
-  key                  = "uc3_infra.tfstate"
-}
+    resource_group_name  = "uc5-state-rg"
+    storage_account_name = "uc5tfstate234"
+    container_name       = "tfstate-uc3"
+    key                  = "uc3_infra.tfstate"
+  }
 }
 
 provider "azurerm" {
@@ -29,7 +28,7 @@ variable "resource_group_name" {
 }
 
 variable "location" {
-  default = "Central India"
+  default = "East Asia"
 }
 
 variable "frontend_app_name" {
@@ -74,7 +73,7 @@ resource "azurerm_service_plan" "asp" {
 }
 
 # ============================================================
-# FRONTEND — Node 24 LTS
+# FRONTEND — Node 20 LTS
 # ============================================================
 
 resource "azurerm_linux_web_app" "frontend" {
@@ -90,7 +89,7 @@ resource "azurerm_linux_web_app" "frontend" {
     app_command_line = "pm2 serve /home/site/wwwroot --no-daemon --spa"
 
     application_stack {
-      node_version = "24-lts"
+      node_version = "20-lts"
     }
   }
 
@@ -181,4 +180,12 @@ output "backend_url" {
 
 output "backend_api_test_url" {
   value = "https://${azurerm_linux_web_app.backend.default_hostname}/api/storage/list"
+}
+
+output "storage_account_name" {
+  value = azurerm_storage_account.storage.name
+}
+
+output "storage_container_name" {
+  value = azurerm_storage_container.uploads.name
 }
