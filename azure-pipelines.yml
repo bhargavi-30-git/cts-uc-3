@@ -1,0 +1,87 @@
+trigger:
+  branches:
+    include:
+      - master
+
+pool:
+  vmImage: "ubuntu-latest"
+
+stages:
+
+# ── STAGE 1: Build Backend ──────────────────────────────────
+- stage: Build_Backend
+  displayName: "Build Backend"
+  jobs:
+  - job: BuildBackend
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: "sdk"
+        version: "8.x"
+
+    - script: dotnet restore
+      workingDirectory: BackendApi
+      displayName: "Restore packages"
+
+    - script: dotnet publish -c Release -o $(Build.ArtifactStagingDirectory)/backend
+      workingDirectory: BackendApi
+      displayName: "Publish backend"
+
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: "$(Build.ArtifactStagingDirectory)/backend"
+        artifact: "backend-drop"
+
+# ── STAGE 2: Build Frontend ─────────────────────────────────
+- stage: Build_Frontend
+  displayName: "Build Frontend"
+  dependsOn: []
+  jobs:
+  - job: BuildFrontend
+    steps:
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: "FrontendApp"
+        Contents: "**"
+        TargetFolder: "$(Build.ArtifactStagingDirectory)/frontend"
+
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: "$(Build.ArtifactStagingDirectory)/frontend"
+        artifact: "frontend-drop"
+
+# ── STAGE 3: Deploy Backend ─────────────────────────────────
+- stage: Deploy_Backend
+  displayName: "Deploy Backend"
+  dependsOn: Build_Backend
+  jobs:
+  - deployment: DeployBackend
+    environment: "production"
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: "Azure for Students"
+              appType: "webAppLinux"
+              appName: "tf-uc3-backend"
+              package: "$(Pipeline.Workspace)/backend-drop"
+
+# ── STAGE 4: Deploy Frontend ────────────────────────────────
+- stage: Deploy_Frontend
+  displayName: "Deploy Frontend"
+  dependsOn: Build_Frontend
+  jobs:
+  - deployment: DeployFrontend
+    environment: "production"
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: "Azure for Students"
+              appType: "webAppLinux"
+              appName: "tf-uc3-frontend"
+              package: "$(Pipeline.Workspace)/frontend-drop"
