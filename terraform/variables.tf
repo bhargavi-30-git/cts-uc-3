@@ -1,55 +1,47 @@
-# =============================================================================
-# variables.tf — Input Variables
-# =============================================================================
-# All configurable values live here. Defaults are pre-filled with Allen's
-# preferred names, but each can be overridden in terraform.tfvars or via CLI.
-# =============================================================================
-
 variable "location" {
-  description = "Azure region for all resources. Central India = lowest latency from Chennai."
+  description = "Default region — used for Resource Group and Storage."
   type        = string
   default     = "Central India"
 }
 
-variable "resource_group_name" {
-  description = "Resource group that holds all UC3 application resources."
+variable "app_location" {
+  description = "Region for App Service Plan + Web Apps. Separate because free F1 isn't allowed in Central India for free-trial subs."
   type        = string
-  default     = "rg-allen-uc3"
+  default     = "Southeast Asia"
+}
+
+variable "resource_group_name" {
+  type    = string
+  default = "rg-allen-uc3"
 }
 
 variable "app_service_plan_name" {
-  description = "App Service Plan — both web apps share this plan to stay on F1 Free tier."
-  type        = string
-  default     = "asp-allen-uc3"
+  type    = string
+  default = "asp-allen-uc3"
 }
 
 variable "frontend_app_name" {
-  description = "Frontend Web App name. MUST be globally unique across all of Azure."
-  type        = string
-  default     = "allen-uc3-frontend-app"
+  type    = string
+  default = "allen-uc3-frontend-app"
 }
 
 variable "backend_app_name" {
-  description = "Backend Web App name. MUST be globally unique across all of Azure."
-  type        = string
-  default     = "allen-uc3-backend-api"
+  type    = string
+  default = "allen-uc3-backend-api"
 }
 
 variable "storage_account_name" {
-  description = "Storage account for blob uploads. Lowercase only, 3-24 chars, no hyphens, globally unique."
-  type        = string
-  default     = "allenuc3appstor"
+  type    = string
+  default = "allenuc3appstor"
 }
 
 variable "storage_container_name" {
-  description = "Blob container that holds uploaded files."
-  type        = string
-  default     = "uploads"
+  type    = string
+  default = "uploads"
 }
 
 variable "common_tags" {
-  description = "Tags applied to every resource for cost tracking & ownership."
-  type        = map(string)
+  type = map(string)
   default = {
     project     = "uc3-fullstackapp"
     owner       = "allen"
