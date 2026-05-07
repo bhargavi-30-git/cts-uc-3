@@ -22,22 +22,13 @@ stages:
   - job: BuildBackend
     steps:
     - task: Docker@2
-      displayName: "Build Backend Docker Image"
+      displayName: "Build and Push Backend to ACR"
       inputs:
-        command: "build"
+        command: "buildAndPush"
+        containerRegistry: "tfuc3acr001"
         repository: "$(BACKEND_IMAGE)"
         dockerfile: "BackendApi/Dockerfile"
         buildContext: "BackendApi"
-        tags: |
-          $(IMAGE_TAG)
-          latest
-
-    - task: Docker@2
-      displayName: "Push Backend to ACR"
-      inputs:
-        command: "push"
-        containerRegistry: "tfuc3acr001"
-        repository: "$(BACKEND_IMAGE)"
         tags: |
           $(IMAGE_TAG)
           latest
@@ -50,22 +41,13 @@ stages:
   - job: BuildFrontend
     steps:
     - task: Docker@2
-      displayName: "Build Frontend Docker Image"
+      displayName: "Build and Push Frontend to ACR"
       inputs:
-        command: "build"
+        command: "buildAndPush"
+        containerRegistry: "tfuc3acr001"
         repository: "$(FRONTEND_IMAGE)"
         dockerfile: "FrontendApp/Dockerfile"
         buildContext: "FrontendApp"
-        tags: |
-          $(IMAGE_TAG)
-          latest
-
-    - task: Docker@2
-      displayName: "Push Frontend to ACR"
-      inputs:
-        command: "push"
-        containerRegistry: "tfuc3acr001"
-        repository: "$(FRONTEND_IMAGE)"
         tags: |
           $(IMAGE_TAG)
           latest
